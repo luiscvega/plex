@@ -5,22 +5,20 @@ import (
 	"regexp"
 )
 
-type Handler func(http.ResponseWriter, *http.Request, map[string]string)
-
-type Route struct {
+type route struct {
 	method  string
 	pattern *regexp.Regexp
 	keys    []string
-	handler Handler
+	handler func(http.ResponseWriter, *http.Request, map[string]string)
 }
 
 type Mux struct {
-	routes []Route
+	routes []route
 }
 
 func (m *Mux) Add(method, path string, handler func(http.ResponseWriter, *http.Request, map[string]string)) {
 	// Step 1: Set method
-	r := Route{method: method}
+	r := route{method: method}
 
 	// Step 2:
 	re := regexp.MustCompile(`:(\w+)`)
@@ -38,6 +36,22 @@ func (m *Mux) Add(method, path string, handler func(http.ResponseWriter, *http.R
 
 	// Step 5:
 	m.routes = append(m.routes, r)
+}
+
+func (m *Mux) Get(path string, handler func(http.ResponseWriter, *http.Request, map[string]string)) {
+	m.Add("GET", path, handler)
+}
+
+func (m *Mux) Post(path string, handler func(http.ResponseWriter, *http.Request, map[string]string)) {
+	m.Add("POST", path, handler)
+}
+
+func (m *Mux) Put(path string, handler func(http.ResponseWriter, *http.Request, map[string]string)) {
+	m.Add("PUT", path, handler)
+}
+
+func (m *Mux) Delete(path string, handler func(http.ResponseWriter, *http.Request, map[string]string)) {
+	m.Add("DELETE", path, handler)
 }
 
 func (m Mux) ServeHTTP(res http.ResponseWriter, req *http.Request) {
@@ -62,5 +76,8 @@ func (m Mux) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 		// Step 4:
 		r.handler(res, req, params)
+
+		// Step 5:
+		break
 	}
 }
