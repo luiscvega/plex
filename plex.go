@@ -16,20 +16,20 @@ type Mux struct {
 	routes []route
 }
 
+var re = regexp.MustCompile(`:(\w+)`)
+
 func (m *Mux) Add(method, path string, handler func(http.ResponseWriter, *http.Request, map[string]string)) {
 	// Step 1: Set method
 	r := route{method: method}
 
 	// Step 2:
-	re := regexp.MustCompile(`:(\w+)`)
-
 	result := re.FindAllStringSubmatch(path, -1)
 	for _, tuple := range result {
 		r.keys = append(r.keys, tuple[1])
 	}
 
 	// Step 3:
-	r.pattern = regexp.MustCompile(re.ReplaceAllLiteralString(path, `([^\\/]+)`))
+	r.pattern = regexp.MustCompile("^" + re.ReplaceAllLiteralString(path, `([^\\/]+)`) + "$")
 
 	// Step 4:
 	r.handler = handler
@@ -77,7 +77,9 @@ func (m Mux) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		// Step 4:
 		r.handler(res, req, params)
 
-		// Step 5:
-		break
+		// Step 5: Return since correct handler was found
+		return
 	}
+
+	res.WriteHeader(http.StatusNotFound)
 }
