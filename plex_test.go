@@ -9,8 +9,8 @@ import (
 func Test1(t *testing.T) {
 	m := Mux{}
 
-	m.Get("/", func(res http.ResponseWriter, req *http.Request, params map[string]string) {
-		res.Write([]byte("OK"))
+	m.Get("/", func(req *http.Request, params map[string]string) Response {
+		return Response{200, []byte("OK")}
 	})
 
 	req, err := http.NewRequest("GET", "/", nil)
@@ -23,8 +23,13 @@ func Test1(t *testing.T) {
 	m.ServeHTTP(w, req)
 
 	body := w.Body.String()
+	statusCode := w.Code
 
 	if body != "OK" {
 		t.Error(body, "!= \"OK\"")
+	}
+
+	if statusCode != http.StatusOK {
+		t.Error(statusCode, "!=", http.StatusOK)
 	}
 }

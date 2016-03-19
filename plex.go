@@ -9,7 +9,7 @@ type route struct {
 	method  string
 	pattern *regexp.Regexp
 	keys    []string
-	handler func(http.ResponseWriter, *http.Request, map[string]string)
+	handler func(*http.Request, map[string]string) Response
 }
 
 type Mux struct {
@@ -18,7 +18,7 @@ type Mux struct {
 
 var re = regexp.MustCompile(`:(\w+)`)
 
-func (m *Mux) Add(method, path string, handler func(http.ResponseWriter, *http.Request, map[string]string)) {
+func (m *Mux) Add(method, path string, handler func(*http.Request, map[string]string) Response) {
 	// Step 1: Set method
 	r := route{method: method}
 
@@ -38,31 +38,31 @@ func (m *Mux) Add(method, path string, handler func(http.ResponseWriter, *http.R
 	m.routes = append(m.routes, r)
 }
 
-func (m *Mux) Get(path string, handler func(http.ResponseWriter, *http.Request, map[string]string)) {
+func (m *Mux) Get(path string, handler func(*http.Request, map[string]string) Response) {
 	m.Add("GET", path, handler)
 }
 
-func (m *Mux) Post(path string, handler func(http.ResponseWriter, *http.Request, map[string]string)) {
+func (m *Mux) Post(path string, handler func(*http.Request, map[string]string) Response) {
 	m.Add("POST", path, handler)
 }
 
-func (m *Mux) Put(path string, handler func(http.ResponseWriter, *http.Request, map[string]string)) {
+func (m *Mux) Put(path string, handler func(*http.Request, map[string]string) Response) {
 	m.Add("PUT", path, handler)
 }
 
-func (m *Mux) Delete(path string, handler func(http.ResponseWriter, *http.Request, map[string]string)) {
+func (m *Mux) Delete(path string, handler func(*http.Request, map[string]string) Response) {
 	m.Add("DELETE", path, handler)
 }
 
-func (m Mux) ServeHTTP(res http.ResponseWriter, req *http.Request) {
-	for _, r := range m.routes {
+func (m Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	for _, route := range m.routes {
 		// Step 1:
-		if req.Method != r.method {
+		if r.Method != route.method {
 			continue
 		}
 
 		// Step 2:
-		matches := r.pattern.FindStringSubmatch(req.URL.Path)
+		matches := route.pattern.FindStringSubmatch(r.URL.Path)
 		if len(matches) == 0 {
 			continue
 		}
@@ -70,16 +70,25 @@ func (m Mux) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 		// Step 3:
 		params := map[string]string{}
 		for i, value := range matches[1:] {
-			key := r.keys[i]
+			key := route.keys[i]
 			params[key] = value
 		}
 
 		// Step 4:
-		r.handler(res, req, params)
+		response := route.handler(r, params)
 
-		// Step 5: Return since correct handler was found
+		// Step 5:
+		w.WriteHeader(response.StatusCode)
+		w.Write(response.Body)
+
+		// Step 6: Return since correct handler was found
 		return
 	}
 
-	res.WriteHeader(http.StatusNotFound)
+	w.WriteHeader(http.StatusNotFound)
+}
+
+type Response struct {
+	StatusCode int
+	Body       []byte
 }
