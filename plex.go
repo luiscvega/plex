@@ -78,6 +78,12 @@ func (m Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		response := route.handler(r, params)
 
 		// Step 5:
+		for k, vs := range response.Headers {
+			for _, v := range vs {
+				w.Header().Add(k, v)
+			}
+		}
+
 		w.WriteHeader(response.StatusCode)
 		w.Write(response.Body)
 
@@ -91,4 +97,5 @@ func (m Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type Response struct {
 	StatusCode int
 	Body       []byte
+	Headers    map[string][]string
 }
