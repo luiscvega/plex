@@ -5,11 +5,21 @@ import (
 	"regexp"
 )
 
+type HandlerFunc func(*http.Request, map[string]string) Response
+
+func (h HandlerFunc) Serve(r *http.Request, params map[string]string) Response {
+	return h(r, params)
+}
+
+type Handler interface {
+	Serve(*http.Request, map[string]string) Response
+}
+
 type route struct {
 	method  string
 	pattern *regexp.Regexp
 	keys    []string
-	handler func(*http.Request, map[string]string) Response
+	handler Handler
 }
 
 type Mux struct {
@@ -18,7 +28,7 @@ type Mux struct {
 
 var re = regexp.MustCompile(`:(\w+)`)
 
-func (m *Mux) Add(method, path string, handler func(*http.Request, map[string]string) Response) {
+func (m *Mux) Add(method, path string, handler Handler) {
 	// Step 1: Set method
 	r := route{method: method}
 
@@ -38,19 +48,19 @@ func (m *Mux) Add(method, path string, handler func(*http.Request, map[string]st
 	m.routes = append(m.routes, r)
 }
 
-func (m *Mux) Get(path string, handler func(*http.Request, map[string]string) Response) {
+func (m *Mux) Get(path string, handler Handler) {
 	m.Add("GET", path, handler)
 }
 
-func (m *Mux) Post(path string, handler func(*http.Request, map[string]string) Response) {
+func (m *Mux) Post(path string, handler Handler) {
 	m.Add("POST", path, handler)
 }
 
-func (m *Mux) Put(path string, handler func(*http.Request, map[string]string) Response) {
+func (m *Mux) Put(path string, handler Handler) {
 	m.Add("PUT", path, handler)
 }
 
-func (m *Mux) Delete(path string, handler func(*http.Request, map[string]string) Response) {
+func (m *Mux) Delete(path string, handler Handler) {
 	m.Add("DELETE", path, handler)
 }
 
@@ -75,7 +85,7 @@ func (m Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Step 4:
-		response := route.handler(r, params)
+		response := route.handler.Serve(r, params)
 
 		// Step 5:
 		for k, vs := range response.Headers {
