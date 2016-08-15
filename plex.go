@@ -15,64 +15,62 @@ type Handler interface {
 	Serve(*http.Request, map[string]string) Response
 }
 
-type route struct {
-	method  string
-	pattern *regexp.Regexp
-	keys    []string
-	handler Handler
+type Route struct {
+	Method  string
+	Pattern *regexp.Regexp
+	Keys    []string
+	Handler Handler
 }
 
-type Mux struct {
-	routes []route
-}
+type Routes []Route
 
 var re = regexp.MustCompile(`:(\w+)`)
 
-func (m *Mux) Add(method, path string, handler Handler) {
+func (rs *Routes) Add(method, path string, handler Handler) {
 	// Step 1: Set method
-	r := route{method: method}
+	r := Route{Method: method}
 
 	// Step 2:
 	result := re.FindAllStringSubmatch(path, -1)
 	for _, tuple := range result {
-		r.keys = append(r.keys, tuple[1])
+		r.Keys = append(r.Keys, tuple[1])
 	}
 
 	// Step 3:
-	r.pattern = regexp.MustCompile("^" + re.ReplaceAllLiteralString(path, `([^\\/]+)`) + "$")
+	r.Pattern = regexp.MustCompile("^" + re.ReplaceAllLiteralString(path, `([^\\/]+)`) + "$")
 
 	// Step 4:
-	r.handler = handler
+	r.Handler = handler
 
 	// Step 5:
-	m.routes = append(m.routes, r)
+	*rs = append(*rs, r)
 }
 
-func (m *Mux) Get(path string, handler Handler) {
-	m.Add("GET", path, handler)
+func (rs *Routes) Get(path string, handler Handler) {
+	rs.Add("GET", path, handler)
 }
 
-func (m *Mux) Post(path string, handler Handler) {
-	m.Add("POST", path, handler)
+func (rs *Routes) Post(path string, handler Handler) {
+	rs.Add("POST", path, handler)
 }
 
-func (m *Mux) Put(path string, handler Handler) {
-	m.Add("PUT", path, handler)
+func (rs *Routes) Put(path string, handler Handler) {
+	rs.Add("PUT", path, handler)
 }
 
-func (m *Mux) Delete(path string, handler Handler) {
-	m.Add("DELETE", path, handler)
+func (rs *Routes) Delete(path string, handler Handler) {
+	rs.Add("DELETE", path, handler)
 }
 
-func (m Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	for _, route := range m.routes {
+func (rs Routes) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	for _, route := range rs {
 		// Step 1:
-		if r.Method != route.method {
+		if r.Method != route.Method {
 			continue
 		}
 
 		// Step 2:
-		matches := route.pattern.FindStringSubmatch(r.URL.Path)
+		matches := route.Pattern.FindStringSubmatch(r.URL.Path)
 		if len(matches) == 0 {
 			continue
 		}
@@ -80,12 +78,12 @@ func (m Mux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// Step 3:
 		params := map[string]string{}
 		for i, value := range matches[1:] {
-			key := route.keys[i]
+			key := route.Keys[i]
 			params[key] = value
 		}
 
 		// Step 4:
-		response := route.handler.Serve(r, params)
+		response := route.Handler.Serve(r, params)
 
 		// Step 5:
 		for k, vs := range response.Headers {
