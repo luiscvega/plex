@@ -1,6 +1,7 @@
 package plex
 
 import (
+	"log"
 	"net/http"
 	"regexp"
 )
@@ -26,7 +27,7 @@ type Routes []Route
 
 var re = regexp.MustCompile(`:(\w+)`)
 
-func (rs *Routes) Add(method, path string, handler Handler) {
+func (rs *Routes) Add(method, path string, handler Handler) *Routes {
 	// Step 1: Set method
 	r := Route{Method: method}
 
@@ -44,6 +45,8 @@ func (rs *Routes) Add(method, path string, handler Handler) {
 
 	// Step 5:
 	*rs = append(*rs, r)
+
+	return rs
 }
 
 func (rs *Routes) Get(path string, handler Handler) {
@@ -86,24 +89,36 @@ func (rs Routes) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		response := route.Handler.Serve(r, params)
 
 		// Step 5:
-		for k, vs := range response.Headers {
+		for k, vs := range response.Header {
 			for _, v := range vs {
 				w.Header().Add(k, v)
 			}
 		}
 
 		w.WriteHeader(response.StatusCode)
-		w.Write(response.Body)
+		_, err := w.Write(response.Body)
+		if err != nil {
+			log.Println("PLEX WRITE ERROR:", err)
+		}
 
 		// Step 6: Return since correct handler was found
 		return
 	}
 
 	w.WriteHeader(http.StatusNotFound)
+	w.Write([]byte("not found"))
 }
 
 type Response struct {
 	StatusCode int
 	Body       []byte
-	Headers    map[string][]string
+	Header     http.Header
+}
+
+func Redirect(url string) Response {
+	return Response{
+		http.StatusFound,
+		nil,
+		http.Header{"Location": []string{url}},
+	}
 }
